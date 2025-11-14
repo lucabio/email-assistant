@@ -1,0 +1,1004 @@
+{
+  "name": "EmailAssistantAndClassifier",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {},
+        "options": {}
+      },
+      "id": "085b966e-ce6f-428f-8d36-f5023d2cf4c1",
+      "name": "Gmail Trigger - Monitor Inbox",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2144,
+        48
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GMAIL_OAUTH2_CREDENTIAL_ID",
+          "name": "Gmail OAuth2 - Executive Account"
+        }
+      },
+      "notes": "Monitors Gmail inbox every 5 minutes for new emails."
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": "={{ $json.id }}",
+        "simple": false,
+        "options": {}
+      },
+      "id": "e10c4423-5a56-4e16-b75f-d355cd2952dc",
+      "name": "Gmail - Get Full Email with Thread",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -1920,
+        48
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GMAIL_OAUTH2_CREDENTIAL_ID",
+          "name": "Gmail OAuth2 - Executive Account"
+        }
+      },
+      "notes": "Fetches full email details including thread ID to analyze conversation history."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract email data and prepare thread ID for fetching\nconst email = $input.first().json;\n\nreturn {\n  json: {\n    emailId: $input.first().json.id,\n    threadId: $input.first().json.threadId,\n    subject: $input.first().json.subject || '',\n    fromEmail: $input.first().json.from.value[0].address,\n    fromName: $input.first().json.from.value[0].name,\n    toEmail: $input.first().json.to.text,\n    date: $input.first().json.date || '',\n    bodyPlain: $input.first().json.text || '',\n    bodyFull: $input.first().json.textAsHtml || email.snippet || '',\n    hasAttachments: email.payload?.parts?.some(p => p.filename) || false,\n    labels: $input.first().json.labelIds || [],\n    processedTimestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "59720c61-c534-477d-b8fd-f0a51b5ed8ce",
+      "name": "Extract Email Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1696,
+        48
+      ],
+      "notes": "Extracts email data including thread ID for conversation context."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "classification_prompt",
+              "name": "classificationPrompt",
+              "value": "=You are an AI assistant helping a C-level executive manage their email inbox. Analyze the email and its conversation thread to classify it accurately.\n\n**CATEGORIES:**\n1. SOCIAL - Social media notifications, LinkedIn, Facebook, Instagram, Twitter\n2. NEWSLETTER - Marketing emails, newsletters, subscriptions, promotional content\n3. ESCALATIONS - Upset/angry stakeholders, complaints, urgent issues requiring immediate diplomatic response. Analyze thread for escalating tone.\n4. RECRUITMENT - Job applications, candidate inquiries, ongoing hiring processes, recruiter outreach\n5. POTENTIAL_PROBLEMS - Emails that may lead to escalations in future interactions. Analyze thread for warning signs like delays, dissatisfaction, unmet expectations\n6. PAYMENTS_DUE - Payment requests, invoices to pay, bills due. Check for deadlines and urgency.\n7. PAYMENT_RECEIPTS - Payment confirmations received, receipts, transaction confirmations (should be forwarded to accounting)\n8. PROJECTS - Project management emails, status updates, coordination (not escalations or problems)\n9. NEW_CLIENTS - Emails from new or potential clients, initial inquiries\n10. COLLABORATION_PROPOSALS - Partnership proposals, collaboration offers, business development opportunities\n11. MEETING_REQUESTS - Meeting invitations, scheduling requests, calendar-related\n12. MISCELLANEOUS - Everything else not fitting above categories\n\n**EMAIL DETAILS:**\nFrom: {{ $json.fromName }} <{{ $json.fromEmail }}>\nSubject: {{ $json.subject }}\nBody: {{ $json.bodyPlain }}\nHas Attachments: {{ $json.hasAttachments }}\nThread ID: {{ $json.threadId }}\n\n**CRITICAL ANALYSIS INSTRUCTIONS:**\n- For ESCALATIONS: Look for angry tone, ALL CAPS, excessive punctuation (!!!), words like \"unacceptable\", \"disappointed\", \"frustrated\", \"lawyer\", \"complaint\"\n- For POTENTIAL_PROBLEMS: Look for phrases like \"still waiting\", \"not satisfied\", \"expected better\", \"concerned about\", \"worried\", hesitation, passive-aggressive language\n- For PAYMENTS_DUE: Extract deadline dates. If payment due within 7 days, set requiresImmediate=true\n- For PAYMENT_RECEIPTS: Identify transaction confirmations, \"payment received\", \"invoice paid\"\n- Analyze conversation context when available\n\n**RESPONSE FORMAT (JSON only):**\n{\n  \"category\": \"CATEGORY_NAME\",\n  \"confidence\": 0.95,\n  \"reasoning\": \"Explanation of classification\",\n  \"requiresImmediate\": true,\n  \"suggestedResponse\": \"Draft response text if requiresImmediate=true\",\n  \"keyPoints\": [\"Point 1\", \"Point 2\"],\n  \"escalationLevel\": \"none|low|medium|high\",\n  \"paymentDeadline\": \"YYYY-MM-DD or null\",\n  \"shouldForward\": false,\n  \"forwardTo\": \"email@example.com or null\",\n  \"autoMarkRead\": false\n}\n\n**RULES:**\n- requiresImmediate=true for: ESCALATIONS, PAYMENTS_DUE (deadline <7 days), POTENTIAL_PROBLEMS (high risk)\n- shouldForward=true for: PAYMENT_RECEIPTS (to accounting@example.com)\n- autoMarkRead=true for: SOCIAL, NEWSLETTER\n- suggestedResponse: Provide ONLY if requiresImmediate=true. Make it professional, empathetic, solution-oriented.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "656a6126-13d7-4345-ac99-df32c9da7fb0",
+      "name": "Prepare AI Classification Prompt",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [
+        -1472,
+        48
+      ],
+      "notes": "Constructs detailed prompt with new categories and thread analysis instructions."
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-5",
+          "mode": "list",
+          "cachedResultName": "GPT-5"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.classificationPrompt }}"
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 3000,
+          "temperature": 1
+        }
+      },
+      "id": "434c62a6-2de5-41d7-bd74-d01ed144f1f1",
+      "name": "OpenAI - Classify Email with Context",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.3,
+      "position": [
+        -1264,
+        48
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "OPENAI_API_CREDENTIAL_ID",
+          "name": "OpenAI API"
+        }
+      },
+      "notes": "GPT-5 classification with advanced thread analysis. Temperature 0.2 for consistency. Max tokens 1000 for detailed responses with superior reasoning."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI classification response\nconst aiResponse = $input.item.json.message?.content || $input.item.json.text;\n\nlet classification;\ntry {\n  const jsonMatch = aiResponse.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    classification = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('No JSON found');\n  }\n} catch (error) {\n  classification = {\n    category: 'MISCELLANEOUS',\n    confidence: 0.5,\n    reasoning: 'Failed to parse AI response',\n    requiresImmediate: false,\n    suggestedResponse: '',\n    keyPoints: ['Classification error'],\n    escalationLevel: 'none',\n    paymentDeadline: null,\n    shouldForward: false,\n    forwardTo: null,\n    autoMarkRead: false\n  };\n}\n\nconst emailData = $('Extract Email Data').first().json;\n\n// Format Gmail label\nconst gmailLabel = classification.category\n    .replace(/_/g, ' ')\n    .toLowerCase()\n    .replace(/\\b\\w/g, l => l.toUpperCase());\n\nreturn {\n  json: {\n    ...emailData,\n    classification: classification.category,\n    confidence: classification.confidence,\n    reasoning: classification.reasoning,\n    requiresImmediate: classification.requiresImmediate || false,\n    suggestedResponse: classification.suggestedResponse || '',\n    keyPoints: classification.keyPoints || [],\n    escalationLevel: classification.escalationLevel || 'none',\n    paymentDeadline: classification.paymentDeadline,\n    shouldForward: classification.shouldForward || false,\n    forwardTo: classification.forwardTo,\n    autoMarkRead: classification.autoMarkRead || false,\n    gmailLabel: gmailLabel\n  }\n};"
+      },
+      "id": "92d42662-fce0-4ffb-995c-ef14362de49c",
+      "name": "Parse Classification Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -912,
+        48
+      ],
+      "notes": "Parses AI response and combines with email data."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false
+          },
+          "conditions": [
+            {
+              "id": "auto_read",
+              "leftValue": "={{ $json.autoMarkRead }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "034fb10c-f755-4e8e-9e82-939d412ce1e5",
+      "name": "Should Auto Mark Read",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        448
+      ],
+      "notes": "Checks if email should be auto-marked as read (SOCIAL, NEWSLETTER)."
+    },
+    {
+      "parameters": {
+        "operation": "markAsRead",
+        "messageId": "={{ $json.emailId }}"
+      },
+      "id": "03c7da29-a788-4fe9-a239-36653fe89707",
+      "name": "Mark Email as Read",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -336,
+        544
+      ],
+      "webhookId": "63166640-4aed-448f-bf06-ea171f2cb8ba",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GMAIL_OAUTH2_CREDENTIAL_ID",
+          "name": "Gmail OAuth2 - Executive Account"
+        }
+      },
+      "notes": "Auto-marks social/newsletter emails as read."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false
+          },
+          "conditions": [
+            {
+              "id": "should_forward",
+              "leftValue": "={{ $json.shouldForward }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d6a88c7f-220e-467e-beda-ac245b28b34e",
+      "name": "Should Forward Email",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        640
+      ],
+      "notes": "Checks if email should be forwarded (payment receipts to accounting)."
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.forwardTo || 'accounting@yourcompany.com' }}",
+        "subject": "=FWD: {{ $json.subject }}",
+        "message": "=Forwarded payment receipt from automated email classifier.\n\nOriginal sender: {{ $json.fromEmail }}\nDate: {{ $json.date }}\n\n---\n\n{{ $json.bodyPlain }}",
+        "options": {}
+      },
+      "id": "22035734-db34-4f0e-ac20-00b9a0cf7505",
+      "name": "Forward to Accounting",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -336,
+        752
+      ],
+      "webhookId": "08973454-2f06-4646-963c-a580633248a8",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GMAIL_OAUTH2_CREDENTIAL_ID",
+          "name": "Gmail OAuth2 - Executive Account"
+        }
+      },
+      "notes": "Forwards payment receipts to accounting. Update email address in parameters."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "immediate",
+              "leftValue": "={{ $json.requiresImmediate }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2dee062e-e82b-4a44-a27a-440a79a116b9",
+      "name": "Requires Immediate Action",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        -224
+      ],
+      "notes": "Routes emails requiring immediate response (escalations, urgent payments, potential problems)."
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "=RE: {{ $('Extract Email Data').item.json.subject }}",
+        "message": "={{ $json.suggestedResponse }}",
+        "options": {
+          "sendTo": "={{ $json.fromEmail }}"
+        }
+      },
+      "id": "3bbf51f5-0808-4949-a2d1-40e557ba3355",
+      "name": "Create Gmail Draft Response",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -320,
+        -304
+      ],
+      "webhookId": "bbf1e724-b8f6-46f8-9584-5845d1bc0851",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GMAIL_OAUTH2_CREDENTIAL_ID",
+          "name": "Gmail OAuth2 - Executive Account"
+        }
+      },
+      "notes": "Creates draft response for immediate action emails using Gmail Draft Create operation."
+    },
+    {
+      "parameters": {
+        "chatId": "6178814616",
+        "text": "={{ $json.telegramMessage }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "7a69d0e1-d057-4640-b4f4-6d89efbb2a32",
+      "name": "Send Telegram Alert with Draft Info",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [
+        176,
+        -304
+      ],
+      "notesInFlow": false,
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_API_CREDENTIAL_ID",
+          "name": "Telegram Bot API"
+        }
+      },
+      "notes": "Sends Telegram notification with suggested response and draft location. REPLACE YOUR_TELEGRAM_CHAT_ID."
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Logs",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Email ID": "={{ $json.emailId }}",
+            "Timestamp": "={{ $json.processedTimestamp }}",
+            "Thread ID": "={{ $json.threadId }}",
+            "From Name": "={{ $json.fromName }}",
+            "From Email": "={{ $json.fromEmail }}",
+            "Subject": "={{ $json.subject }}",
+            "Classification": "={{ $json.classification }}",
+            "Confidence": "={{ $json.confidence }}",
+            "Requires Immediate": "={{ $json.requiresImmediate }}",
+            "Escalation Level": "={{ $json.escalationLevel }}",
+            "Payment Deadline": "={{ $json.paymentDeadline }}",
+            "Auto Forwarded": "={{ $json.shouldForward }}",
+            "Auto Read": "={{ $json.autoMarkRead }}",
+            "Reasoning": "={{ $json.reasoning }}",
+            "Key Points": "={{ $json.keyPoints }}"
+          },
+          "matchingColumns": [
+            "Email ID"
+          ],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email ID",
+              "displayName": "Email ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Thread ID",
+              "displayName": "Thread ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "From Name",
+              "displayName": "From Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "From Email",
+              "displayName": "From Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Subject",
+              "displayName": "Subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Classification",
+              "displayName": "Classification",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Confidence",
+              "displayName": "Confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Requires Immediate",
+              "displayName": "Requires Immediate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Escalation Level",
+              "displayName": "Escalation Level",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Payment Deadline",
+              "displayName": "Payment Deadline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Auto Forwarded",
+              "displayName": "Auto Forwarded",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Auto Read",
+              "displayName": "Auto Read",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Reasoning",
+              "displayName": "Reasoning",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Key Points",
+              "displayName": "Key Points",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "1ca4e403-d448-4663-abb9-dc4860d24ec3",
+      "name": "Log to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        -560,
+        944
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_OAUTH2_CREDENTIAL_ID",
+          "name": "Google Sheets OAuth2"
+        }
+      },
+      "notes": "Logs all classifications for analytics. REPLACE YOUR_GOOGLE_SHEET_ID."
+    },
+    {
+      "parameters": {
+        "content": "## 🎯 NEW WORKFLOW - 12 CATEGORIES\n\n**Immediate Action Categories:**\n• ESCALATIONS (angry stakeholders)\n• PAYMENTS_DUE (deadline <7 days)\n• POTENTIAL_PROBLEMS (future escalation risk)\n\n**Auto-Forward:**\n• PAYMENT_RECEIPTS → accounting\n\n**Auto-Read:**\n• SOCIAL\n• NEWSLETTER\n\n**Standard Categories:**\n• RECRUITMENT\n• PROJECTS\n• NEW_CLIENTS\n• COLLABORATION_PROPOSALS\n• MEETING_REQUESTS\n• MISCELLANEOUS",
+        "height": 440,
+        "width": 340
+      },
+      "id": "245421d9-467c-4ad3-bed3-612d57493d57",
+      "name": "Note - Categories Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2592,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## ⚙️ SETUP CHECKLIST\n\n1. Gmail OAuth2 (Google Cloud)\n2. OpenAI API Key (GPT-4)\n3. Telegram Bot Token\n4. **REPLACE PLACEHOLDERS:**\n   - YOUR_TELEGRAM_CHAT_ID\n   - YOUR_GOOGLE_SHEET_ID\n   - accounting@yourcompany.com\n\n5. Create Google Sheet with headers:\n   - Timestamp, Email ID, Thread ID,\n     From Name, From Email, Subject,\n     Classification, Confidence,\n     Requires Immediate, Escalation Level,\n     Payment Deadline, Auto Forwarded,\n     Auto Read, Reasoning, Key Points",
+        "height": 520,
+        "width": 380
+      },
+      "id": "9db9438d-cc5c-4f45-8d70-0d0354500612",
+      "name": "Note - Setup Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2592,
+        384
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "e12b83ae-95a8-4044-af3b-8ad8d0ebe30d",
+      "name": "Merge All Paths",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        1184,
+        320
+      ],
+      "notes": "Merges all execution paths before final logging."
+    },
+    {
+      "parameters": {
+        "resource": "label",
+        "returnAll": "={{ true }}"
+      },
+      "id": "5265818b-0923-4549-9e07-9c55a46c9736",
+      "name": "Get All Labels",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -560,
+        240
+      ],
+      "webhookId": "17f82c6e-2d54-40e0-86d1-a74845163044",
+      "alwaysOutputData": false,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GMAIL_OAUTH2_CREDENTIAL_ID",
+          "name": "Gmail OAuth2 - Executive Account"
+        }
+      },
+      "notes": "Applies classification label to email."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get ALL items from the node (not just first)\n  const allItems = $('Get All Labels').all();\n\n  const emailData = $('Parse Classification Result').first().json;\n\n  // Extract json from each item to get array of labels\n  const labelsData = allItems.map(item => item.json);\n\n  // Get the label name we want to check\n  const targetLabelName = $('Parse Classification Result').first().json.gmailLabel;\n\n  // Debug: vediamo tutti i nomi delle label\n  const allLabelNames = labelsData.map(l => l.name);\n\n  // Search for the label\n  const existingLabel = labelsData.find(label => label.name === targetLabelName);\n\n  return {\n    json: {\n      ...$json,\n      ...emailData,\n      targetLabelName: targetLabelName,  // Cosa stiamo cercando\n      allLabelNames: allLabelNames,      // Cosa c'è realmente\n      labelId: existingLabel ? existingLabel.id : null,\n      labelName: existingLabel ? existingLabel.name : null,\n      labelExists: !!existingLabel\n    }\n  };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        240
+      ],
+      "id": "96633bfa-910e-4755-aaea-fc2a0f838d3a",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "42ec7d3d-9f01-44e0-9156-04aa612500bf",
+              "leftValue": "={{ $json.labelExists }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -144,
+        240
+      ],
+      "id": "3dc953b7-05ac-42bd-b08b-307a6d309961",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $json.emailId }}",
+        "labelIds": "={{ $json.labelId }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        128,
+        128
+      ],
+      "id": "ce9435c5-9bc9-43d7-b664-2aaac6c8145d",
+      "name": "Add label to message",
+      "webhookId": "59ae3c45-e4bf-405a-b627-3aa0f1334e50",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GMAIL_OAUTH2_CREDENTIAL_ID",
+          "name": "Gmail OAuth2 - Executive Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "label",
+        "operation": "create",
+        "name": "={{ $json.gmailLabel }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        128,
+        320
+      ],
+      "id": "5db7de6d-a2fa-4300-b5bd-c22250912cba",
+      "name": "Create a label",
+      "webhookId": "9c7ec58d-1e54-40d9-828b-2942cb91afc4",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GMAIL_OAUTH2_CREDENTIAL_ID",
+          "name": "Gmail OAuth2 - Executive Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const aiResponse = $input.first().json;\n\n  return {\n    json: {\n      rawResponse: aiResponse,\n      messageContent: aiResponse.message?.content || aiResponse.text || aiResponse,\n      type: typeof aiResponse\n    }\n  };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -976,
+        -128
+      ],
+      "id": "624e7605-9d6a-464f-ba71-09602294df7c",
+      "name": "Debug AI",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Requires Immediate Action').first().json;\n\n  // Componi il messaggio Telegram con condizioni JavaScript\n  let message = `🚨 *REQUIRES IMMEDIATE ATTENTION*\n\n  📧 *From:* ${data.fromName} (${data.fromEmail})\n  📝 *Subject:* ${data.subject}\n  🏷 *Category:* ${data.gmailLabel}`;\n\n  // Aggiungi escalation level solo se non è 'none'\n  if (data.escalationLevel && data.escalationLevel !== 'none') {\n    message += `\\n⚠️ *Escalation Level:* ${data.escalationLevel.toUpperCase()}`;\n  }\n\n  // Aggiungi payment deadline solo se esiste\n  if (data.paymentDeadline && data.paymentDeadline !== null) {\n    message += `\\n💰 *Payment Due:* ${data.paymentDeadline}`;\n  }\n\n  message += `\n\n  *AI Analysis:*\n  ${data.reasoning}\n\n  *Key Points:*`;\n\n  // Aggiungi key points\n  if (data.keyPoints && data.keyPoints.length > 0) {\n    data.keyPoints.forEach(point => {\n      message += `\\n• ${point}`;\n    });\n  } else {\n    message += '\\n• No key points available';\n  }\n\n  message += `\n\n  *📝 SUGGESTED RESPONSE:*\n  ${data.suggestedResponse}\n\n  ✅ Draft created in Gmail\n  👉 [Open Drafts](https://mail.google.com/mail/u/0/#drafts)\n  👉 [View Email](https://mail.google.com/mail/u/0/#inbox/${data.emailId})`;\n\n  return {\n    json: {\n      ...data,\n      telegramMessage: message\n    }\n  };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -64,
+        -304
+      ],
+      "id": "74150f5e-a519-4ee3-8f98-cc2d8b26aca1",
+      "name": "Code in JavaScript1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger - Monitor Inbox": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Get Full Email with Thread",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Get Full Email with Thread": {
+      "main": [
+        [
+          {
+            "node": "Extract Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Email Data": {
+      "main": [
+        [
+          {
+            "node": "Prepare AI Classification Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare AI Classification Prompt": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Classify Email with Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Classify Email with Context": {
+      "main": [
+        [
+          {
+            "node": "Parse Classification Result",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Debug AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Classification Result": {
+      "main": [
+        [
+          {
+            "node": "Get All Labels",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Should Auto Mark Read",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Should Forward Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Requires Immediate Action",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Auto Mark Read": {
+      "main": [
+        [
+          {
+            "node": "Mark Email as Read",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge All Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Email as Read": {
+      "main": [
+        [
+          {
+            "node": "Merge All Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Forward Email": {
+      "main": [
+        [
+          {
+            "node": "Forward to Accounting",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge All Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Forward to Accounting": {
+      "main": [
+        [
+          {
+            "node": "Merge All Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Requires Immediate Action": {
+      "main": [
+        [
+          {
+            "node": "Create Gmail Draft Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge All Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Gmail Draft Response": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Telegram Alert with Draft Info": {
+      "main": [
+        [
+          {
+            "node": "Merge All Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Merge All Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Labels": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Add label to message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create a label",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add label to message": {
+      "main": [
+        [
+          {
+            "node": "Merge All Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a label": {
+      "main": [
+        [
+          {
+            "node": "Merge All Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Alert with Draft Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "7b75a273-4895-40f0-bc5a-391c75affb0c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "YOUR_N8N_INSTANCE_ID"
+  },
+  "id": "YOUR_WORKFLOW_ID",
+  "tags": []
+}

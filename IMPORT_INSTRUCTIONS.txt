@@ -1,0 +1,143 @@
+================================================================================
+  EMAIL ASSISTANT AND CLASSIFIER - N8N WORKFLOW
+  Quick Import Instructions
+================================================================================
+
+STEP 1: IMPORT THE WORKFLOW
+----------------------------
+1. Open your N8N instance
+2. Click "Workflows" in the left sidebar
+3. Click "Add Workflow" > "Import from File"
+4. Select: EmailAssistantAndClassifier.json
+5. Workflow will appear in editor
+
+STEP 2: REQUIRED CREDENTIALS (4 total)
+---------------------------------------
+Before activating, you MUST configure these credentials:
+
+[1] Gmail OAuth2
+    - Type: Gmail OAuth2
+    - Name: "Gmail OAuth2 - Executive Account"
+    - Requires: Google Cloud project with Gmail API enabled
+    - Used by: Gmail Trigger, Apply Labels, Create Drafts
+
+[2] OpenAI API
+    - Type: OpenAI API Key
+    - Name: "OpenAI API"
+    - Requires: OpenAI account with API key
+    - Used by: Classification and Draft Generation nodes
+
+[3] Telegram Bot API
+    - Type: Telegram API
+    - Name: "Telegram Bot API"
+    - Requires: Telegram bot token from @BotFather
+    - Used by: Send Telegram Notification node
+
+[4] Google Sheets OAuth2
+    - Type: Google Sheets OAuth2
+    - Name: "Google Sheets OAuth2"
+    - Requires: Same Google Cloud project, Sheets API enabled
+    - Used by: Log to Google Sheets node
+
+STEP 3: UPDATE PLACEHOLDERS
+----------------------------
+Replace these values in the workflow:
+
+Node: "Send Telegram Notification"
+  └─ Find: YOUR_TELEGRAM_CHAT_ID
+     Replace with: Your numeric Telegram chat ID (e.g., 123456789)
+
+Node: "Log to Google Sheets"
+  └─ Find: YOUR_GOOGLE_SHEET_ID
+     Replace with: Your Google Sheets spreadsheet ID
+     (from URL: docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit)
+
+STEP 4: TEST BEFORE ACTIVATING
+-------------------------------
+1. Send a test email to the Gmail account
+2. Click "Execute Workflow" (do NOT activate yet)
+3. Check execution log for errors
+4. Verify:
+   - Email was classified correctly
+   - Gmail label was applied
+   - Google Sheets has new row
+   - Telegram notification sent (if high priority)
+
+STEP 5: ACTIVATE
+----------------
+1. Toggle "Active" switch (top right corner)
+2. Workflow will now run automatically every 5 minutes
+3. Monitor first few executions in "Executions" tab
+
+================================================================================
+QUICK REFERENCE
+================================================================================
+
+File Locations:
+  /home/lucab/Projects/EmailAssistantAutomation/EmailAssistantAndClassifier.json
+  /home/lucab/Projects/EmailAssistantAutomation/SETUP_GUIDE.md
+  /home/lucab/Projects/EmailAssistantAutomation/QUICK_START_CHECKLIST.md
+
+Documentation:
+  README.md                    - Project overview
+  SETUP_GUIDE.md              - Detailed setup instructions
+  CUSTOMIZATION_EXAMPLES.md   - Code examples for modifications
+  QUICK_START_CHECKLIST.md    - Step-by-step deployment checklist
+  WORKFLOW_DIAGRAM.md         - Visual workflow architecture
+  IMPORT_INSTRUCTIONS.txt     - This file
+
+Support:
+  N8N Docs: https://docs.n8n.io/
+  N8N Community: https://community.n8n.io/
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+Issue: Workflow won't activate
+Solution: Check all 4 credentials are connected (green checkmark)
+
+Issue: No emails being processed
+Solution: Ensure workflow is active AND Gmail OAuth2 is authorized
+
+Issue: OpenAI errors
+Solution: Verify API key is valid and account has credits
+
+Issue: Telegram not sending
+Solution: Ensure chat ID is numeric (not @username) and bot isn't blocked
+
+Issue: Google Sheets not logging
+Solution: Verify spreadsheet ID is correct and sheet name matches exactly
+
+For detailed troubleshooting, see SETUP_GUIDE.md
+
+================================================================================
+NEXT STEPS AFTER IMPORT
+================================================================================
+
+Immediate:
+  [ ] Import workflow
+  [ ] Configure 4 credentials
+  [ ] Update 2 placeholders (Telegram chat ID, Sheets ID)
+  [ ] Test with sample email
+  [ ] Activate workflow
+
+Within First Week:
+  [ ] Monitor classification accuracy
+  [ ] Review Google Sheets log daily
+  [ ] Adjust AI prompts if needed
+  [ ] Verify costs are within budget
+
+Ongoing:
+  [ ] Review classifications weekly
+  [ ] Update VIP sender list monthly
+  [ ] Refine draft response templates
+  [ ] Archive old Google Sheets data quarterly
+
+================================================================================
+
+Questions? Refer to SETUP_GUIDE.md or N8N community forums.
+
+Version: 1.0 | Created: 2025-11-07 | Platform: N8N
+
+================================================================================

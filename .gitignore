@@ -1,0 +1,30 @@
+# N8N Credentials and Secrets
+*.env
+.env
+.env.*
+credentials/
+secrets/
+
+# Temporary files
+*.tmp
+*.log
+*.bak
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node modules (if any)
+node_modules/
+
+# Private configuration
+config.private.json
+*-private.*
