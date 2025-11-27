@@ -4,6 +4,7 @@
 .env.*
 credentials/
 secrets/
+server/
 
 # Temporary files
 *.tmp
