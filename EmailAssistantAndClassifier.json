@@ -11,7 +11,12 @@
           ]
         },
         "simple": false,
-        "filters": {},
+        "filters": {
+          "includeSpamTrash": false,
+          "labels": ["INBOX"],
+          "sender": "",
+          "readStatus": "unread"
+        },
         "options": {}
       },
       "id": "085b966e-ce6f-428f-8d36-f5023d2cf4c1",
